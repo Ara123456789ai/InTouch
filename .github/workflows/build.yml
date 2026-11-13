@@ -1,0 +1,50 @@
+name: Build InTouch from zip
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: |
+          unzip -q mverechena.zip
+          ls mverechena
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android folder and patch manifest
+        working-directory: mverechena
+        run: |
+          flutter create --platforms=android --org zw.co.mverechena --project-name mverechena .
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|android:label="[^"]*"|android:label="InTouch"|' android/app/src/main/AndroidManifest.xml
+          rm -rf test
+
+      - name: Get packages and app icon
+        working-directory: mverechena
+        run: |
+          flutter pub get
+          dart run flutter_launcher_icons
+
+      - name: Build APK
+        working-directory: mverechena
+        run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mverechena-apk
+          path: mverechena/build/app/outputs/flutter-apk/app-release.apk
